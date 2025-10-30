@@ -2,3 +2,4 @@
 * text=auto
 images/*.jpg filter=lfs diff=lfs merge=lfs -text
 images/*.png filter=lfs diff=lfs merge=lfs -text
+images/*.jpeg filter=lfs diff=lfs merge=lfs -text
