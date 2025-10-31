@@ -6,3 +6,5 @@ images/*.jpeg filter=lfs diff=lfs merge=lfs -text
 flickr30k_images/*.jpg filter=lfs diff=lfs merge=lfs -text
 flickr30k_images/*.png filter=lfs diff=lfs merge=lfs -text
 flickr30k_images/*.jpeg filter=lfs diff=lfs merge=lfs -text
+model_epoch_10.pt filter=lfs diff=lfs merge=lfs -text
+model-checkpoints/* filter=lfs diff=lfs merge=lfs -text
