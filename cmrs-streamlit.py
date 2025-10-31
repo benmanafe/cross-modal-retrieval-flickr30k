@@ -19,17 +19,19 @@ def ensure_images_from_kaggle():
     zip_path = "flickr30k_images.zip"
 
     if not os.path.exists(image_dir):
-        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
-        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+        st.info("📦 Downloading Flickr30k images from Kaggle (this happens only once)...")
 
         os.system("pip install -q kaggle")
-        os.system("kaggle datasets download -d yourusername/flickr30k-images -f flickr30k_images.zip")
 
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        os.system("kaggle datasets download -d eeshawn/flickr30k_images -f flickr30k_images.zip")
+
+        # Extract and clean up
+        with zipfile.ZipFile("flickr30k_images.zip", 'r') as zip_ref:
             zip_ref.extractall(image_dir)
-        os.remove(zip_path)
+        os.remove("flickr30k_images.zip")
 
     return image_dir
+
 
 @st.cache_resource
 def load_model_and_data():
@@ -116,3 +118,4 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
+
