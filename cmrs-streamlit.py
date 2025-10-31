@@ -20,7 +20,7 @@ TXT_EMBEDS_PATH = MODEL_DIR / "txt_embeds_epoch_10.pt"
 
 CAPTIONS_PATH = APP_ROOT / "captions.txt"
 IMAGE_DIR = APP_ROOT / "flickr30k_images"
-ZIP_PATH = APP_ROOT / "flickr30k_images.zip"
+ZIP_PATH = APP_ROOT / "flickr30k_images"
 
 st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide")
 st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
@@ -126,3 +126,4 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}* \n**Score:** {scores[i]:.3f}")
+
