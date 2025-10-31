@@ -44,8 +44,8 @@ def load_model_and_data():
     model = model.to(device)
     model.eval()
 
-    img_embeds = torch.load("model-checkpoints/model_epoch_10.pt", map_location=device)
-    txt_embeds = torch.load("model-checkpoints/model_epoch_10.pt", map_location=device)
+    img_embeds = torch.load("cross-modal-retrieval-flickr30k/model-checkpoints/img_embeds_epoch_10.pt", map_location=device)
+    txt_embeds = torch.load("cross-modal-retrieval-flickr30k/model-checkpoints/txt_embeds_epoch_10.pt", map_location=device)
 
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 
