@@ -17,29 +17,70 @@ st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide"
 st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
 
-# ------------------------------
-# 0. Kaggle Download Helper
-# ------------------------------
+import subprocess # Use subprocess for better error checking
+
 def ensure_images_from_kaggle():
     image_dir = "flickr30k_images"
-    zip_path = "flickr30k_images.zip"
+    zip_path = "flickr30k_images.zip" # Corrected this variable to match the file
+    kaggle_dir = os.path.expanduser("~/.kaggle")
+    kaggle_json = os.path.join(kaggle_dir, "kaggle.json")
 
     if not os.path.exists(image_dir):
-        st.info("📦 Downloading Flickr30k images from Kaggle (only once)...")
+        st.info("📦 Setting up Kaggle credentials...")
 
-        # Install kaggle silently
-        os.system("pip install -q kaggle")
+        # Create .kaggle directory if it doesn't exist
+        os.makedirs(kaggle_dir, exist_ok=True)
 
-        # Download from the public dataset by eeshawn
-        os.system("kaggle datasets download eeshawn/flickr30k")
+        # Try to write credentials from Streamlit Secrets
+        # This will work on Streamlit Cloud
+        try:
+            kaggle_username = st.secrets["KAGGLE_USERNAME"]
+            kaggle_key = st.secrets["KAGGLE_KEY"]
+            
+            with open(kaggle_json, "w") as f:
+                f.write(f'{{"username":"{kaggle_username}","key":"{kaggle_key}"}}')
+            
+            # Set correct permissions
+            os.chmod(kaggle_json, 0o600)
+            
+        except FileNotFoundError:
+            # This happens if st.secrets doesn't exist (e.g., local dev)
+            # We assume kaggle.json is already in ~/.kaggle locally
+            if not os.path.exists(kaggle_json):
+                st.error("Kaggle API credentials not found.")
+                st.stop("Please add your kaggle.json to ~/.kaggle/ or add KAGGLE_USERNAME and KAGGLE_KEY to your Streamlit Secrets.")
 
-        # Extract and clean up
-        with zipfile.ZipFile("flickr30k_images.zip", "r") as zip_ref:
-            zip_ref.extractall(image_dir)
-        os.remove("flickr30k_images.zip")
+        st.info("📦 Downloading Flickr30k images (this may take a moment)...")
 
+        # Use subprocess.run to check for errors
+        download_command = [
+            "kaggle", "datasets", "download",
+            "-d", "eeshawn/flickr30k",
+            "-f", zip_path
+        ]
+        
+        # Run the command and capture output
+        result = subprocess.run(download_command, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            st.error(f"Kaggle download failed. Error:\n{result.stderr}")
+            st.stop()
+        
+        st.info("Extracting images...")
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(image_dir)
+            os.remove(zip_path) # Clean up the zip file
+            st.success("✅ Images ready!")
+            
+        except zipfile.BadZipFile:
+            st.error("Failed to unzip file. It may be corrupted or the download was incomplete.")
+            st.stop()
+        except FileNotFoundError:
+            st.error(f"Zip file not found at {zip_path}. Download may have failed silently.")
+            st.stop()
+            
     return image_dir
-
 # ------------------------------
 # 1. Load Model and Data
 # ------------------------------
@@ -142,6 +183,7 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
+
 
 
 
