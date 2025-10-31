@@ -18,66 +18,62 @@ st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
 
 import subprocess # Use subprocess for better error checking
-
 def ensure_images_from_kaggle():
     image_dir = "flickr30k_images"
-    zip_path = "flickr30k_images.zip" # Corrected this variable to match the file
+    zip_path = "flickr30k.zip" 
     kaggle_dir = os.path.expanduser("~/.kaggle")
     kaggle_json = os.path.join(kaggle_dir, "kaggle.json")
 
-    if not os.path.exists(image_dir):
+    if not (os.path.exists(image_dir) and len(os.listdir(image_dir)) > 5):
         st.info("📦 Setting up Kaggle credentials...")
-
-        # Create .kaggle directory if it doesn't exist
         os.makedirs(kaggle_dir, exist_ok=True)
 
-        # Try to write credentials from Streamlit Secrets
-        # This will work on Streamlit Cloud
         try:
             kaggle_username = st.secrets["KAGGLE_USERNAME"]
             kaggle_key = st.secrets["KAGGLE_KEY"]
-            
             with open(kaggle_json, "w") as f:
                 f.write(f'{{"username":"{kaggle_username}","key":"{kaggle_key}"}}')
-            
-            # Set correct permissions
             os.chmod(kaggle_json, 0o600)
-            
         except FileNotFoundError:
-            # This happens if st.secrets doesn't exist (e.g., local dev)
-            # We assume kaggle.json is already in ~/.kaggle locally
             if not os.path.exists(kaggle_json):
                 st.error("Kaggle API credentials not found.")
-                st.stop("Please add your kaggle.json to ~/.kaggle/ or add KAGGLE_USERNAME and KAGGLE_KEY to your Streamlit Secrets.")
+                st.stop("Add KAGGLE_USERNAME/KEY to Streamlit Secrets & reboot.")
 
-        st.info("📦 Downloading Flickr30k images (this may take a moment)...")
+        st.info("📦 Installing Kaggle CLI...")
+        subprocess.run(["pip", "install", "-q", "kaggle"], check=True)
 
-        # Use subprocess.run to check for errors
+        st.info("📦 Downloading Flickr30k dataset (this may take a moment)...")
+        
         download_command = [
             "kaggle", "datasets", "download",
-            "-d", "eeshawn/flickr30k",
-            "-f", zip_path
+            "-d", "eeshawn/flickr30k"
         ]
         
-        # Run the command and capture output
         result = subprocess.run(download_command, capture_output=True, text=True)
 
         if result.returncode != 0:
             st.error(f"Kaggle download failed. Error:\n{result.stderr}")
+            st.warning("Please ensure you have accepted the dataset rules on the Kaggle website (and rebooted the app).")
             st.stop()
         
         st.info("Extracting images...")
         try:
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(image_dir)
-            os.remove(zip_path) # Clean up the zip file
+            os.remove(zip_path)
+
+            nested_img_dir = os.path.join(image_dir, "flickr30k_images") 
+
+            if os.path.exists(nested_img_dir):
+                st.info("Fixing directory structure...")
+                for item in os.listdir(nested_img_dir):
+                    shutil.move(os.path.join(nested_img_dir, item), os.path.join(image_dir, item))
+                os.rmdir(nested_img_dir)
+
             st.success("✅ Images ready!")
             
-        except zipfile.BadZipFile:
-            st.error("Failed to unzip file. It may be corrupted or the download was incomplete.")
-            st.stop()
-        except FileNotFoundError:
-            st.error(f"Zip file not found at {zip_path}. Download may have failed silently.")
+        except (zipfile.BadZipFile, FileNotFoundError):
+            st.error(f"Failed to unzip file. Expected '{zip_path}' but it was not found. Download may have failed.")
             st.stop()
             
     return image_dir
@@ -183,6 +179,7 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
+
 
 
 
