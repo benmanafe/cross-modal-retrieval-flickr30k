@@ -1,8 +1,3 @@
-# app.py
-# Streamlit Cross-Modal Retrieval (Flickr30k)
-# Author: You
-# Date: 2025-10-30
-
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer
@@ -13,41 +8,26 @@ import numpy as np
 import streamlit as st
 import os
 
-# ------------------------------
-# 1. Import your model definition
-# ------------------------------
-# Ensure CrossModalModel, ImageEncoder, TextEncoder classes
-# are available in a separate file named model.py or above this script
 from model import CrossModalModel
 
-# ------------------------------
-# 2. App Configuration
-# ------------------------------
 st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide")
 st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
 
-# ------------------------------
-# 3. Load Artifacts
-# ------------------------------
 @st.cache_resource
 def load_model_and_data():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load model
     model = CrossModalModel(embed_dim=1024)
     model.load_state_dict(torch.load("model-checkpoints/model_epoch_10.pt", map_location=device))
     model = model.to(device)
     model.eval()
 
-    # Load embeddings
     img_embeds = torch.load("model-checkpoints/img_embeds_epoch_10.pt", map_location=device)
     txt_embeds = torch.load("model-checkpoints/txt_embeds_epoch_10.pt", map_location=device)
 
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 
-    # Load captions and image paths
     captions = pd.read_csv("captions.txt", sep=",")[["image_name", "comment"]]
     image_root = "flickr30k_images/"
     image_paths = [os.path.join(image_root, img) for img in captions["image_name"].unique()]
@@ -56,9 +36,6 @@ def load_model_and_data():
 
 model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device = load_model_and_data()
 
-# ------------------------------
-# 4. Image Preprocessing
-# ------------------------------
 val_test_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -67,9 +44,6 @@ val_test_transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-# ------------------------------
-# 5. Retrieval Functions
-# ------------------------------
 def retrieve_images(text_query, top_k=10):
     tokens = tokenizer(
         text_query,
@@ -99,9 +73,6 @@ def retrieve_texts(uploaded_image, top_k=10):
     scores = [sims[i].item() for i in topk_idx]
     return results, scores
 
-# ------------------------------
-# 6. Streamlit UI
-# ------------------------------
 mode = st.radio("Choose a retrieval mode:", ["🗨️ Text → Image", "🖼️ Image → Text"], horizontal=True)
 
 if mode == "🗨️ Text → Image":
@@ -125,4 +96,5 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
+
 
