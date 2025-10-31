@@ -7,64 +7,74 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import os, zipfile
-import pathlib
 
 from model import CrossModalModel
 
-APP_ROOT = pathlib.Path(__file__).parent
-
-MODEL_DIR = APP_ROOT / "model-checkpoints"
-MODEL_PATH = MODEL_DIR / "model_epoch_10.pt"
-IMG_EMBEDS_PATH = MODEL_DIR / "img_embeds_epoch_10.pt"
-TXT_EMBEDS_PATH = MODEL_DIR / "txt_embeds_epoch_10.pt"
-
-CAPTIONS_PATH = APP_ROOT / "captions.txt"
-IMAGE_DIR = APP_ROOT / "flickr30k_images"
-ZIP_PATH = APP_ROOT / "flickr30k_images"
-
+# ------------------------------
+# Streamlit Page Config
+# ------------------------------
 st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide")
 st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
 
+# ------------------------------
+# 0. Kaggle Download Helper
+# ------------------------------
 def ensure_images_from_kaggle():
-    if not os.path.exists(IMAGE_DIR):
+    image_dir = "flickr30k_images"
+    zip_path = "flickr30k_images"
+
+    if not os.path.exists(image_dir):
         st.info("📦 Downloading Flickr30k images from Kaggle (only once)...")
 
+        # Install kaggle silently
         os.system("pip install -q kaggle")
 
-        os.system(f"kaggle datasets download -d eeshawn/flickr30k -f flickr30k_images -p {APP_ROOT}")
+        # Download from the public dataset by eeshawn
+        os.system("kaggle datasets download -d eeshawn/flickr30k -f flickr30k_images")
 
-        with zipfile.ZipFile(ZIP_PATH, "r") as zip_ref:
-            zip_ref.extractall(IMAGE_DIR)
-        os.remove(ZIP_PATH)
+        # Extract and clean up
+        with zipfile.ZipFile("flickr30k_images", "r") as zip_ref:
+            zip_ref.extractall(image_dir)
+        os.remove("flickr30k_images")
 
-    return IMAGE_DIR
+    return image_dir
 
-
+# ------------------------------
+# 1. Load Model and Data
+# ------------------------------
 @st.cache_resource
 def load_model_and_data():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # Load model
     model = CrossModalModel(embed_dim=1024)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    model.load_state_dict(torch.load("model-checkpoints/model_epoch_10.pt", map_location=device))
     model = model.to(device)
     model.eval()
 
-    img_embeds = torch.load(IMG_EMBEDS_PATH, map_location=device)
-    txt_embeds = torch.load(TXT_EMBEDS_PATH, map_location=device)
+    # Load embeddings
+    img_embeds = torch.load("model-checkpoints/img_embeds_epoch_10.pt", map_location=device)
+    txt_embeds = torch.load("model-checkpoints/txt_embeds_epoch_10.pt", map_location=device)
 
+    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 
-    captions = pd.read_csv(CAPTIONS_PATH, sep=",")[["image_name", "comment"]]
+    # Load captions
+    captions = pd.read_csv("captions.txt", sep=",")[["image_name", "comment"]]
 
+    # Ensure images exist (download if needed)
     image_root = ensure_images_from_kaggle()
-    image_paths = [image_root / img for img in captions["image_name"].unique()]
+    image_paths = [os.path.join(image_root, img) for img in captions["image_name"].unique()]
 
     return model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device
 
 
 model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device = load_model_and_data()
 
+# ------------------------------
+# 2. Image Preprocessing
+# ------------------------------
 val_test_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -73,6 +83,9 @@ val_test_transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
+# ------------------------------
+# 3. Retrieval Functions
+# ------------------------------
 def retrieve_images(text_query, top_k=10):
     tokens = tokenizer(
         text_query,
@@ -103,6 +116,9 @@ def retrieve_texts(uploaded_image, top_k=10):
     scores = [sims[i].item() for i in topk_idx]
     return results, scores
 
+# ------------------------------
+# 4. Streamlit Interface
+# ------------------------------
 mode = st.radio("Choose a retrieval mode:", ["🗨️ Text → Image", "🖼️ Image → Text"], horizontal=True)
 
 if mode == "🗨️ Text → Image":
@@ -115,7 +131,7 @@ if mode == "🗨️ Text → Image":
             for i, col in enumerate(cols):
                 idx = row_start + i
                 if idx < len(images):
-                    col.image(str(images[idx]), caption=f"Score: {scores[idx]:.3f}", width=220)
+                    col.image(images[idx], caption=f"Score: {scores[idx]:.3f}", width=220)
 
 elif mode == "🖼️ Image → Text":
     uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
@@ -125,5 +141,4 @@ elif mode == "🖼️ Image → Text":
         st.info("Retrieving the most similar captions...")
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
-            st.markdown(f"**{i+1}.** *{row['comment']}* \n**Score:** {scores[i]:.3f}")
-
+            st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
