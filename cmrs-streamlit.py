@@ -6,13 +6,30 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 import streamlit as st
-import os
+import os, zipfile
 
 from model import CrossModalModel
 
 st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide")
 st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
+
+def ensure_images_from_kaggle():
+    image_dir = "flickr30k_images"
+    zip_path = "flickr30k_images.zip"
+
+    if not os.path.exists(image_dir):
+        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
+        os.system("pip install -q kaggle")
+        os.system("kaggle datasets download -d yourusername/flickr30k-images -f flickr30k_images.zip")
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(image_dir)
+        os.remove(zip_path)
+
+    return image_dir
 
 @st.cache_resource
 def load_model_and_data():
@@ -29,10 +46,12 @@ def load_model_and_data():
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 
     captions = pd.read_csv("captions.txt", sep=",")[["image_name", "comment"]]
-    image_root = "flickr30k_images/"
+
+    image_root = ensure_images_from_kaggle()
     image_paths = [os.path.join(image_root, img) for img in captions["image_name"].unique()]
 
     return model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device
+
 
 model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device = load_model_and_data()
 
@@ -62,6 +81,7 @@ def retrieve_images(text_query, top_k=10):
     results = [image_paths[i] for i in topk_idx]
     scores = [sims[i].item() for i in topk_idx]
     return results, scores
+
 
 def retrieve_texts(uploaded_image, top_k=10):
     image = val_test_transform(uploaded_image).unsqueeze(0).to(device)
@@ -96,5 +116,3 @@ elif mode == "🖼️ Image → Text":
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
             st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
-
-
