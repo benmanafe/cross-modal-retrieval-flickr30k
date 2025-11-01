@@ -6,18 +6,15 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 import streamlit as st
-import os, zipfile
+import os, zipfile, subprocess
 
 from model import CrossModalModel
 
-# ------------------------------
-# Streamlit Page Config
-# ------------------------------
+
 st.set_page_config(page_title="Cross-Modal Retrieval (Flickr30k)", layout="wide")
-st.title("🔍 Cross-Modal Retrieval System – Flickr30k")
+st.title("Cross-Modal Retrieval System – Flickr30k")
 st.markdown("Search images with text, or captions with images.")
 
-import subprocess # Use subprocess for better error checking
 def ensure_images_from_kaggle():
     image_dir = "flickr30k_images"
     zip_path = "flickr30k.zip" 
@@ -25,7 +22,7 @@ def ensure_images_from_kaggle():
     kaggle_json = os.path.join(kaggle_dir, "kaggle.json")
 
     if not (os.path.exists(image_dir) and len(os.listdir(image_dir)) > 5):
-        st.info("📦 Setting up Kaggle credentials...")
+        st.info("Setting up Kaggle credentials...")
         os.makedirs(kaggle_dir, exist_ok=True)
 
         try:
@@ -39,10 +36,10 @@ def ensure_images_from_kaggle():
                 st.error("Kaggle API credentials not found.")
                 st.stop("Add KAGGLE_USERNAME/KEY to Streamlit Secrets & reboot.")
 
-        st.info("📦 Installing Kaggle CLI...")
+        st.info("Installing Kaggle CLI...")
         subprocess.run(["pip", "install", "-q", "kaggle"], check=True)
 
-        st.info("📦 Downloading Flickr30k dataset (this may take a moment)...")
+        st.info("Downloading Flickr30k dataset (this may take a moment)...")
         
         download_command = [
             "kaggle", "datasets", "download",
@@ -70,37 +67,30 @@ def ensure_images_from_kaggle():
                     shutil.move(os.path.join(nested_img_dir, item), os.path.join(image_dir, item))
                 os.rmdir(nested_img_dir)
 
-            st.success("✅ Images ready!")
+            st.success("Images ready!")
             
         except (zipfile.BadZipFile, FileNotFoundError):
             st.error(f"Failed to unzip file. Expected '{zip_path}' but it was not found. Download may have failed.")
             st.stop()
             
     return image_dir
-# ------------------------------
-# 1. Load Model and Data
-# ------------------------------
+
 @st.cache_resource
 def load_model_and_data():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load model
     model = CrossModalModel(embed_dim=1024)
     model.load_state_dict(torch.load("model-checkpoints/model_epoch_10.pt", map_location=device))
     model = model.to(device)
     model.eval()
 
-    # Load embeddings
     img_embeds = torch.load("model-checkpoints/img_embeds_epoch_10.pt", map_location=device)
     txt_embeds = torch.load("model-checkpoints/txt_embeds_epoch_10.pt", map_location=device)
 
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 
-    # Load captions
     captions = pd.read_csv("captions.txt", sep=",")[["image_name", "comment"]]
 
-    # Ensure images exist (download if needed)
     image_root = ensure_images_from_kaggle()
     image_paths = [os.path.join(image_root, img) for img in captions["image_name"].unique()]
 
@@ -109,9 +99,7 @@ def load_model_and_data():
 
 model, tokenizer, img_embeds, txt_embeds, captions, image_paths, device = load_model_and_data()
 
-# ------------------------------
-# 2. Image Preprocessing
-# ------------------------------
+
 val_test_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -120,9 +108,7 @@ val_test_transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-# ------------------------------
-# 3. Retrieval Functions
-# ------------------------------
+
 def retrieve_images(text_query, top_k=10):
     tokens = tokenizer(
         text_query,
@@ -153,12 +139,10 @@ def retrieve_texts(uploaded_image, top_k=10):
     scores = [sims[i].item() for i in topk_idx]
     return results, scores
 
-# ------------------------------
-# 4. Streamlit Interface
-# ------------------------------
-mode = st.radio("Choose a retrieval mode:", ["🗨️ Text → Image", "🖼️ Image → Text"], horizontal=True)
 
-if mode == "🗨️ Text → Image":
+mode = st.radio("Choose a retrieval mode:", ["Text → Image", "Image → Text"], horizontal=True)
+
+if mode == "Text → Image":
     query = st.text_input("Enter a caption or text query:")
     if query:
         st.info("Searching for the most similar images (Top 10)...")
@@ -170,7 +154,7 @@ if mode == "🗨️ Text → Image":
                 if idx < len(images):
                     col.image(images[idx], caption=f"Score: {scores[idx]:.3f}", width=220)
 
-elif mode == "🖼️ Image → Text":
+elif mode == "Image → Text":
     uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
     if uploaded_file:
         image = Image.open(uploaded_file).convert("RGB")
@@ -178,10 +162,4 @@ elif mode == "🖼️ Image → Text":
         st.info("Retrieving the most similar captions...")
         results, scores = retrieve_texts(image)
         for i, (idx, row) in enumerate(results.iterrows()):
-            st.markdown(f"**{i+1}.** *{row['comment']}*  \n**Score:** {scores[i]:.3f}")
-
-
-
-
-
-
+            st.markdown(f"**{i+1}.** *{row['comment']}* \n**Score:** {scores[i]:.3f}")
