@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.vscode/
+
+# Data and large artifacts (GitHub rejects files over 100 MB)
+flickr30k_images/
+flickr30k_cache/
+dataset_flickr30k.json
+captions.txt
+*.pt
+runs/*/tensorboard/
+deploy/
+model-checkpoints/

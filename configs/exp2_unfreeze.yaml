@@ -1,0 +1,9 @@
+# Unfreeze more of both encoders.
+model:
+  embed_dim: 512
+  image_unfreeze_from: 3
+  text_unfreeze_from: 4
+train:
+  run_name: exp2_unfreeze
+  epochs: 15
+  lr_backbone: 3.0e-5

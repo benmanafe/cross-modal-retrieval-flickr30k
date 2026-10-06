@@ -1,0 +1,10 @@
+torch
+torchvision
+transformers
+pillow
+numpy
+tqdm
+pyyaml
+fastapi
+uvicorn
+python-multipart

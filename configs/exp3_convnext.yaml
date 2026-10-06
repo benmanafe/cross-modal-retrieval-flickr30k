@@ -1,0 +1,10 @@
+# Same recipe as exp1_fixes, but ConvNeXt-Tiny as the image backbone.
+# image_unfreeze_from: 5 -> stage 3, the last downsample and stage 4 are trainable; stem and stages 1-2 stay frozen.
+model:
+  embed_dim: 1024
+  image_backbone: convnext_tiny
+  image_unfreeze_from: 5
+  text_unfreeze_from: 8
+train:
+  run_name: exp3_convnext
+  epochs: 20

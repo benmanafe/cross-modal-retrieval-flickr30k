@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cross-Modal Retrieval Demo</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #fff; --text: #1c1c1a; --muted: #6b6b66; --line: #e3e3de;
+    --accent: #2f5bea; --good: #1f8a4c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16161a; --card: #1f1f24; --text: #ececea; --muted: #9a9a94; --line: #32323a; --accent: #7b9bff; --good: #4cc27f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); cursor: pointer; font: inherit; }
+  .tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+  button.go { padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  button.alt { padding: 10px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .chips { margin: 10px 0 0; display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 3px 10px; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: .85rem; cursor: pointer; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+  .grid figure { margin: 0; }
+  .grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; background: var(--line); }
+  figcaption { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+  @media (max-width: 640px) { .split { grid-template-columns: 1fr; } }
+  .split img { width: 100%; border-radius: 8px; }
+  ol { margin: 0; padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  .score { color: var(--muted); font-size: .8rem; margin-left: 6px; }
+  .ok { color: var(--good); font-size: .8rem; margin-left: 6px; font-weight: 600; }
+  .msg { color: var(--muted); margin-top: 16px; }
+  .err { color: #d33; margin-top: 16px; }
+  details { margin-top: 12px; color: var(--muted); font-size: .9rem; }
+  footer { margin-top: 24px; color: var(--muted); font-size: .85rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cross-Modal Retrieval</h1>
+  <p class="sub">Search images with text, or find captions for an image. ConvNeXt-Tiny + MiniLM trained contrastively on Flickr30k.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-t2i" aria-selected="true">Text → Image</button>
+    <button class="tab" role="tab" id="tab-i2t" aria-selected="false">Image → Text</button>
+  </div>
+
+  <section class="panel" id="panel-t2i">
+    <form class="row" id="t2i-form">
+      <input type="text" id="query" value="a dog running through the snow" aria-label="Describe an image">
+      <button class="go" type="submit">Search</button>
+    </form>
+    <div class="chips" id="examples"></div>
+    <div id="t2i-out"></div>
+  </section>
+
+  <section class="panel" id="panel-i2t" hidden>
+    <div class="row">
+      <input type="file" id="file" accept="image/*">
+      <button class="alt" id="random">Try a random gallery image</button>
+    </div>
+    <div id="i2t-out"></div>
+  </section>
+
+  <footer id="info"></footer>
+</main>
+
+<script>
+// Set window.API_BASE (e.g. "https://your-space.hf.space") before this script when hosting the page elsewhere.
+const API = (window.API_BASE || "").replace(/\/$/, "");
+const $ = (id) => document.getElementById(id);
+const EXAMPLES = ["a dog running through the snow", "two children playing on a beach", "a man riding a bike down a street", "people sitting at a table eating", "a person climbing a rock face"];
+
+async function call(path, options) {
+  const res = await fetch(API + path, options);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+function busy(el, text) { el.innerHTML = `<p class="msg">${text}</p>`; }
+function fail(el, e) { el.innerHTML = `<p class="err">${e.message}</p>`; }
+function esc(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function captionList(results) {
+  return `<ol>${results.map((r) => `<li>${esc(r.caption)}<span class="score">${r.score.toFixed(3)}</span>${r.correct ? '<span class="ok">✓ ground truth</span>' : ""}</li>`).join("")}</ol>`;
+}
+
+// ----- tabs -----
+function show(which) {
+  for (const t of ["t2i", "i2t"]) {
+    $("tab-" + t).setAttribute("aria-selected", t === which);
+    $("panel-" + t).hidden = t !== which;
+  }
+}
+$("tab-t2i").onclick = () => show("t2i");
+$("tab-i2t").onclick = () => show("i2t");
+
+// ----- text -> image -----
+async function searchText(q) {
+  const out = $("t2i-out");
+  busy(out, "Searching…");
+  try {
+    const { results } = await call("/api/text-to-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, k: 12 }) });
+    out.innerHTML = `<div class="grid">${results.map((r) => `<figure><img src="${API}${r.image}" alt="" loading="lazy"><figcaption>${r.score.toFixed(3)}</figcaption></figure>`).join("")}</div>`;
+  } catch (e) { fail(out, e); }
+}
+$("t2i-form").onsubmit = (ev) => { ev.preventDefault(); if ($("query").value.trim()) searchText($("query").value); };
+$("examples").innerHTML = EXAMPLES.map((e) => `<button class="chip" type="button">${e}</button>`).join("");
+$("examples").onclick = (ev) => { if (ev.target.classList.contains("chip")) { $("query").value = ev.target.textContent; searchText(ev.target.textContent); } };
+
+// ----- image -> text -----
+function renderI2T(src, results, truth) {
+  $("i2t-out").innerHTML = `<div class="split"><div><img src="${src}" alt="Query image"></div><div>${captionList(results)}` +
+    (truth ? `<details><summary>Ground-truth captions</summary><ul>${truth.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></details>` : "") + `</div></div>`;
+}
+$("file").onchange = async () => {
+  const f = $("file").files[0];
+  if (!f) return;
+  busy($("i2t-out"), "Finding captions…");
+  const form = new FormData();
+  form.append("file", f);
+  try {
+    const { results } = await call("/api/image-to-text?k=8", { method: "POST", body: form });
+    renderI2T(URL.createObjectURL(f), results);
+  } catch (e) { fail($("i2t-out"), e); }
+};
+$("random").onclick = async () => {
+  busy($("i2t-out"), "Picking an image…");
+  try {
+    const d = await call("/api/random-image?k=8");
+    renderI2T(API + d.image, d.results, d.ground_truth);
+  } catch (e) { fail($("i2t-out"), e); }
+};
+
+call("/api/info").then((i) => { $("info").textContent = `Searching ${i.images.toLocaleString()} unseen test images and ${i.captions.toLocaleString()} captions.`; }).catch(() => {});
+searchText($("query").value);
+</script>
+</body>
+</html>

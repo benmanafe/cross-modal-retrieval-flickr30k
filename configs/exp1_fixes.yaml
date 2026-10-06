@@ -1,0 +1,9 @@
+# Same architecture as the original model (embed 1024, EfficientNet stages 6+, MiniLM layers 8+ trainable);
+# only the training/data fixes differ, so the gain over the baseline is attributable to them.
+model:
+  embed_dim: 1024
+  image_unfreeze_from: 6
+  text_unfreeze_from: 8
+train:
+  run_name: exp1_fixes
+  epochs: 25

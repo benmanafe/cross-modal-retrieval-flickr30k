@@ -1,0 +1,34 @@
+{
+  "data": {
+    "split_json": "D:\\BINUS\\Portfolio Projects\\CmRS-Flickr30k\\dataset_flickr30k.json",
+    "image_dir": "D:\\BINUS\\Portfolio Projects\\CmRS-Flickr30k\\flickr30k_images",
+    "cache_dir": "D:\\BINUS\\Portfolio Projects\\CmRS-Flickr30k\\flickr30k_cache",
+    "cache_size": 256,
+    "img_size": 224,
+    "tokenizer": "sentence-transformers/all-MiniLM-L12-v2",
+    "max_len": 128,
+    "batch_size": 64,
+    "num_workers": 4,
+    "seed": 42
+  },
+  "model": {
+    "embed_dim": 1024,
+    "image_backbone": "convnext_tiny",
+    "text_backbone": "sentence-transformers/all-MiniLM-L12-v2",
+    "image_unfreeze_from": 5,
+    "text_unfreeze_from": 8,
+    "dropout": 0.1
+  },
+  "train": {
+    "run_name": "exp3_convnext",
+    "out_dir": "D:\\BINUS\\Portfolio Projects\\CmRS-Flickr30k\\runs",
+    "epochs": 20,
+    "lr_backbone": 5e-05,
+    "lr_head": 0.0005,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.05,
+    "grad_clip": 1.0,
+    "amp": true,
+    "patience": 3
+  }
+}
