@@ -1,4 +1,4 @@
-# Cross-Modal Retrieval on Flickr30k
+# Cross-Modal Retrieval on Flickr30ka
 
 Search images with a sentence, or find captions for an image. A dual-encoder model (image encoder + text encoder) is trained contrastively on Flickr30k so that matching images and captions land close together in a shared embedding space.
 
