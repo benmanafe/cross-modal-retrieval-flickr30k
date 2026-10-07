@@ -1,12 +1,3 @@
-"""Builds the self-contained `deploy/` folder the web demo needs.
-
-    python export_deploy.py [--checkpoint runs/exp3_convnext/best.pt] [--split test]
-
-deploy/
-    model.pt      weights + model config (no optimizer state)
-    gallery.pt    filenames, captions, caption->image map, image/text embeddings
-    images/       the gallery images (256px cache copies)
-"""
 import argparse
 import shutil
 from pathlib import Path

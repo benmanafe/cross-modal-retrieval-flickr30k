@@ -1,9 +1,3 @@
-"""FastAPI backend + static web demo for the cross-modal retrieval model.
-
-    uvicorn server:app --port 8000        (then open http://localhost:8000)
-
-Reads everything from deploy/ (see export_deploy.py). Set DEPLOY_DIR to point elsewhere.
-"""
 import io
 import os
 import random
