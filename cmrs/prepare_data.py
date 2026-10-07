@@ -1,4 +1,3 @@
-"""One-off: build the pre-resized image cache.   Usage: python -m cmrs.prepare_data"""
 from .config import DataConfig
 from .data import build_image_cache
 

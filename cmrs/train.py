@@ -1,9 +1,3 @@
-"""Train the cross-modal model.
-
-Usage:
-    python -m cmrs.train --config configs/exp1_fixes.yaml
-    tensorboard --logdir runs
-"""
 import argparse
 import json
 import math

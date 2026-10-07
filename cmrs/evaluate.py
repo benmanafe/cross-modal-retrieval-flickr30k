@@ -1,9 +1,3 @@
-"""Retrieval evaluation (Recall@K) on the Karpathy val/test splits.
-
-Usage:
-    python -m cmrs.evaluate --checkpoint model-checkpoints/model_epoch_10.pt --split test
-Works for both the original checkpoints and the ones saved by the new train.py.
-"""
 import argparse
 import json
 
